@@ -413,6 +413,41 @@ module ZMQ {
   private extern const ZMQ_CONFLATE: c_int;
   private extern const ZMQ_ZAP_DOMAIN: c_int;
 
+  /*
+   The boolean indicating if the ZMQ socket is a PLAIN server
+   */
+  const PLAIN_SERVER = ZMQ_PLAIN_SERVER;
+
+  /*
+   The PLAIN server username
+   */
+  const PLAIN_USERNAME = ZMQ_PLAIN_USERNAME;
+
+  /*
+   The PLAIN server password
+   */
+  const PLAIN_PASSWORD = ZMQ_PLAIN_PASSWORD;
+
+  /*
+   The boolean indicating the ZMQ socket is a CURVE server
+   */
+  const CURVE_SERVER = ZMQ_CURVE_SERVER;
+
+  /*
+   The CURVE server public key
+   */
+  const CURVE_PUBLICKEY = ZMQ_CURVE_PUBLICKEY;
+
+  /*
+   The CURVE server secret key
+   */
+  const CURVE_SECRETKEY = ZMQ_CURVE_SECRETKEY;
+
+  /*
+   The CURVE server public key referenced by the CURVE client
+   */
+  const CURVE_SERVERKEY = ZMQ_CURVE_SERVERKEY;
+
   // -- Message Options
   private extern const ZMQ_MORE: c_int;
 
@@ -436,6 +471,21 @@ module ZMQ {
   private extern const ZMQ_NULL: c_int;
   private extern const ZMQ_PLAIN: c_int;
   private extern const ZMQ_CURVE: c_int;
+
+  /*
+   Indicates NULL authenticator
+   */
+  const NULL = ZMQ_NULL;
+
+  /*
+   Indicates PLAIN authenticator
+   */
+  const PLAIN = ZMQ_PLAIN;
+
+  /*
+   Indicates CURVE authenticator
+   */
+  const CURVE = ZMQ_CURVE;
 
   pragma "no doc"
   const unset = -42;
@@ -870,6 +920,76 @@ module ZMQ {
           // see #12397
           throw new owned ZMQError("Error in Socket.setUnsubscribe(): " +
                                    errmsg);
+        }
+      }
+    }
+
+    proc setCurveServer(value: c_int) throws {
+      on classRef.home {
+        var copy: c_int = value;
+        var ret = zmq_setsockopt(classRef.socket, ZMQ_CURVE_SERVER,
+                                 c_ptrTo(copy): c_void_ptr,
+                                 numBytes(value.type)): c_int;
+        if ret == -1 {
+          var errmsg: string;
+          try! {
+            errmsg = createStringWithNewBuffer(zmq_strerror(errno));
+          }
+          // It would be good to use a factory method for a ZMQError subclass,
+          // see #12397
+          throw new owned ZMQError("Error in Socket.setCurveServer(): " + errmsg);
+        }
+      }
+    }
+
+    proc setPlainServer(value: c_int) throws {
+      on classRef.home {
+        var copy: c_int = value;
+        var ret = zmq_setsockopt(classRef.socket, ZMQ_PLAIN_SERVER,
+                                 c_ptrTo(copy): c_void_ptr,
+                                 numBytes(value.type)): c_int;
+        if ret == -1 {
+          var errmsg: string;
+          try! {
+            errmsg = createStringWithNewBuffer(zmq_strerror(errno));
+          }
+          // It would be good to use a factory method for a ZMQError subclass,
+          // see #12397
+          throw new owned ZMQError("Error in Socket.setPlainServer(): " + errmsg);
+        }
+      }
+    }
+
+    proc setPlainUsername(value: string) throws {
+      on classRef.home {
+        var ret = zmq_setsockopt(classRef.socket, ZMQ_PLAIN_USERNAME,
+                                 value.c_str(): c_void_ptr,
+                                 value.numBytes:size_t): int;
+        if ret == -1 {
+          var errmsg: string;
+          try! {
+            errmsg = createStringWithNewBuffer(zmq_strerror(errno));
+          }
+          // It would be good to use a factory method for a ZMQError subclass,
+          // see #12397
+          throw new owned ZMQError("Error in Socket.setPlainUsername(): " + errmsg);
+        }
+      }
+    }
+
+    proc setPlainPassword(value: string) throws {
+      on classRef.home {
+        var ret = zmq_setsockopt(classRef.socket, ZMQ_PLAIN_PASSWORD,
+                                 value.c_str(): c_void_ptr,
+                                 value.numBytes:size_t): int;
+        if ret == -1 {
+          var errmsg: string;
+          try! {
+            errmsg = createStringWithNewBuffer(zmq_strerror(errno));
+          }
+          // It would be good to use a factory method for a ZMQError subclass,
+          // see #12397
+          throw new owned ZMQError("Error in Socket.setPlainPassword(): " + errmsg);
         }
       }
     }
