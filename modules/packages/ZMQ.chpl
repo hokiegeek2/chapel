@@ -261,7 +261,7 @@ References
 */
 module ZMQ {
 
-  require "zmq.h", "-lzmq", "ZMQHelper/zmq_helper.h", "ZMQHelper/zmq_helper.c";
+  require "zmq.h", "czmq.h", "-lzmq", "ZMQHelper/zmq_helper.h", "ZMQHelper/zmq_helper.c";
 
   private use Reflection;
   private use ExplicitRefCount;
@@ -277,6 +277,15 @@ module ZMQ {
   extern type zmq_msg_t;
 
   // C API
+  private extern proc fopen(filepath: c_string, permissions: c_string): c_void_ptr;
+  private extern proc fprintf(file: c_void_ptr, print_string: c_string);
+  private extern proc fclose(file : c_void_ptr);
+  private extern proc zactor_new(task: c_void_ptr, args...?n): c_void_ptr;
+  private extern proc zcertstore_new(location: c_string): c_void_ptr; 
+  private extern proc zauth(pipe: c_void_ptr, args...?n); 
+  private extern proc zstr_sendx (dest: c_void_ptr, args...?n);
+  private extern proc zsock_set_zap_domain(server: c_void_ptr, scope: c_string);
+  private extern proc zsock_wait(server: c_void_ptr);
   private extern proc zmq_bind(sock: c_void_ptr, endpoint: c_string): c_int;
   private extern proc zmq_close(ctx: c_void_ptr): c_int;
   private extern proc zmq_connect(sock: c_void_ptr, endpoint: c_string): c_int;
@@ -475,17 +484,17 @@ module ZMQ {
   /*
    Indicates NULL authenticator
    */
-  const NULL = ZMQ_NULL;
+  const NULL_AUTH = ZMQ_NULL;
 
   /*
    Indicates PLAIN authenticator
    */
-  const PLAIN = ZMQ_PLAIN;
+  const PLAIN_AUTH = ZMQ_PLAIN;
 
   /*
    Indicates CURVE authenticator
    */
-  const CURVE = ZMQ_CURVE;
+  const CURVE_AUTH = ZMQ_CURVE;
 
   pragma "no doc"
   const unset = -42;
@@ -493,6 +502,26 @@ module ZMQ {
   pragma "no doc"
   proc free_helper(data: c_void_ptr, hint: c_void_ptr) {
     chpl_here_free(data);
+  }
+
+  /*
+    Instantiates a zauth object with a zcertstore configured by the 
+    certstore_path parameter. If the certstore_path is nil or empty, 
+    the zcertstore is purely in-memory.
+
+    :returns: a zauth object that is passed to a zactor object
+  */
+  proc get_auth(sock : c_void_ptr, certstore_path : string) : c_void_ptr {
+    var store : c_void_ptr = nil; 
+    if certstore_path != "" {
+      store = zcertstore_new(certstore_path.c_str());
+    }
+    else { 
+      var path : c_string = nil;
+      store = zcertstore_new(path);
+    }
+    //return zactor_new(zauth(sock, nil), store)
+    return zactor_new(zauth, store);
   }
 
   /*
@@ -537,7 +566,6 @@ module ZMQ {
         }
       }
     }
-
   } // class ContextClass
 
   /*
@@ -652,7 +680,7 @@ module ZMQ {
 
     pragma "no doc"
     var context: Context;
-
+    var auth: c_void_ptr;
     pragma "no doc"
     proc init() {
       compilerError("Cannot create Socket directly; try Context.socket()");
@@ -680,9 +708,16 @@ module ZMQ {
         }
         return newClass!;
       }
-
       this.classRef = makeClass(ctx, sockType);
       this.context = ctx;
+      var pass_filepath = '/tmp/passwords'.c_str();
+      var pass_file = fopen(pass_filepath, "w".c_str());
+      fprintf (pass_file, "admin=Ark0Uda\n".c_str());
+      fclose (pass_file);
+      zsock_set_zap_domain(this.classRef.socket, "global".c_str());
+      this.auth = get_auth(this.classRef.socket, '');
+      zstr_sendx(this.auth, "PLAIN", pass_filepath, nil);
+      zsock_wait(this.auth);
       this.complete();
     }
 
@@ -750,7 +785,6 @@ module ZMQ {
         }
       }
     }
-
 
     /*
       Get the last endpoint for the specified socket; see
@@ -957,6 +991,12 @@ module ZMQ {
           // see #12397
           throw new owned ZMQError("Error in Socket.setPlainServer(): " + errmsg);
         }
+      }
+    }
+
+    proc setZapDomain(value: c_int) throws {
+      on classRef.home {
+        zsock_set_zap_domain(classRef.socket, "global".c_str());
       }
     }
 
