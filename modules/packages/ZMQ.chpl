@@ -280,9 +280,9 @@ module ZMQ {
   private extern proc fopen(filepath: c_string, permissions: c_string): c_void_ptr;
   private extern proc fprintf(file: c_void_ptr, print_string: c_string);
   private extern proc fclose(file : c_void_ptr);
-  private extern proc zactor_new(task: c_void_ptr, args...?n): c_void_ptr;
+  private extern proc zactor_new(task: c_fn_ptr, args...?n): c_void_ptr;
   private extern proc zcertstore_new(location: c_string): c_void_ptr; 
-  private extern proc zauth(pipe: c_void_ptr, args...?n); 
+  private extern proc zauth(pipe: c_void_ptr, certstore: c_void_ptr); 
   private extern proc zstr_sendx (dest: c_void_ptr, args...?n);
   private extern proc zsock_set_zap_domain(server: c_void_ptr, scope: c_string);
   private extern proc zsock_wait(server: c_void_ptr);
@@ -505,11 +505,11 @@ module ZMQ {
   }
 
   /*
-    Instantiates a zauth object with a zcertstore configured by the 
-    certstore_path parameter. If the certstore_path is nil or empty, 
+    Instantiates a zactor-decorated zauth object with a zcertstore configured 
+    by the certstore_path parameter. If the certstore_path is nil or empty, 
     the zcertstore is purely in-memory.
 
-    :returns: a zauth object that is passed to a zactor object
+    :returns: a zactor auth object
   */
   proc get_auth(sock : c_void_ptr, certstore_path : string) : c_void_ptr {
     var store : c_void_ptr = nil; 
@@ -520,8 +520,7 @@ module ZMQ {
       var path : c_string = nil;
       store = zcertstore_new(path);
     }
-    //return zactor_new(zauth(sock, nil), store)
-    return zactor_new(zauth, store);
+    return zactor_new(c_ptrTo(zauth), store);
   }
 
   /*
@@ -717,6 +716,7 @@ module ZMQ {
       zsock_set_zap_domain(this.classRef.socket, "global".c_str());
       this.auth = get_auth(this.classRef.socket, '');
       zstr_sendx(this.auth, "PLAIN", pass_filepath, nil);
+      //zsock_set_plain_server (this.classRef.socket, 1); 
       zsock_wait(this.auth);
       this.complete();
     }
